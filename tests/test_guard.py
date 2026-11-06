@@ -1,3 +1,4 @@
+import ipaddress
 from dataclasses import replace
 
 import pytest
@@ -92,7 +93,13 @@ def test_redirect_into_metadata_endpoint_is_refused(web, monkeypatch) -> None:  
 
 @pytest.mark.parametrize("host", ["2130706433", "0x7f.1", "0177.0.0.1", "127.1"])
 def test_obfuscated_loopback_spellings_never_get_through(host: str) -> None:
-    """Some platforms expand these to 127.0.0.1 (refused), others reject them as unresolvable
-    (also refused). What must never happen is a successful resolution."""
-    with pytest.raises(NetcheckError):
-        resolve_target(host, 80, DEFAULT)
+    """Platforms disagree about these spellings: some expand them to 127.0.0.1 (refused), some
+    reject them as unresolvable (refused), and some (macOS) read a leading 0 as decimal, so
+    '0177.0.0.1' becomes the PUBLIC address 177.0.0.1, which is allowed. What must never happen is
+    a successful resolution to a loopback/private/internal address."""
+    try:
+        addrs = resolve_target(host, 80, DEFAULT)
+    except NetcheckError:
+        return
+    for a in addrs:
+        assert ipaddress.ip_address(a).is_global, f"{host!r} resolved to non-public {a}"

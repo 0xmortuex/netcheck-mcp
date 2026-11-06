@@ -260,13 +260,28 @@ class DnsLab:
         self.queries: list[tuple[str, str, str]] = []
         self.truncate_udp = truncate_udp
         self.swallow = swallow
-        self.udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.udp.bind(("127.0.0.1", 0))
+        # DNS needs the SAME port number for UDP and TCP. The OS picks the UDP port, but that
+        # number can be reserved or in use for TCP (Windows excluded ranges give WinError 10013,
+        # other OSes EADDRINUSE), so retry with a fresh port until both protocols bind.
+        last: OSError | None = None
+        for _ in range(50):
+            udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                udp.bind(("127.0.0.1", 0))
+                tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                tcp.bind(("127.0.0.1", udp.getsockname()[1]))
+                tcp.listen(5)
+            except OSError as e:
+                last = e
+                udp.close()
+                tcp.close()
+                continue
+            self.udp, self.tcp = udp, tcp
+            break
+        else:
+            raise RuntimeError(f"no port free for both UDP and TCP after 50 tries: {last}")
         self.port: int = self.udp.getsockname()[1]
-        self.tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.tcp.bind(("127.0.0.1", self.port))
-        self.tcp.listen(5)
         self._stop = False
         self._threads = [threading.Thread(target=self._udp_loop, daemon=True),
                          threading.Thread(target=self._tcp_loop, daemon=True)]
