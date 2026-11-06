@@ -1,0 +1,51 @@
+[project]
+name = "netcheck-mcp"
+version = "0.1.0"
+description = "MCP server that checks whether a site or host is healthy and configured right: TLS certificates and chains, DNS (own resolver, no dnspython), HTTP redirects and timings, security headers, ports, and email DNS (SPF/DMARC/DKIM)."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "0xmortuex" }]
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=2.0.0",
+]
+keywords = ["mcp", "tls", "ssl", "dns", "http", "spf", "dmarc", "security-headers", "devops", "ai-agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet",
+    "Topic :: System :: Networking :: Monitoring",
+]
+
+[project.optional-dependencies]
+# cryptography is TEST-ONLY: tests mint throwaway CAs and certificates (expired,
+# self-signed, wrong host, missing intermediate) at run time. The server itself
+# has no dependency beyond mcp.
+test = ["pytest>=7", "anyio", "cryptography>=42"]
+
+[project.urls]
+Homepage = "https://github.com/0xmortuex/netcheck-mcp"
+
+[project.scripts]
+netcheck-mcp = "netcheck_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/netcheck_mcp"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.pytest.ini_options]
+markers = ["network: needs the real internet (example.com, badssl.com); excluded from default runs"]
+addopts = "-m 'not network'"
